@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bridge Structural Health Monitoring</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center py-4 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-600 rounded-lg">
+                    <i data-lucide="activity" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Smart Bridge SHM</h1>
+                    <p class="text-xs text-slate-400">Structural Stress & Health Monitoring System</p>
+                </div>
+            </div>
+
+            <!-- Page Navigation Tabs -->
+            <nav class="flex space-x-1 bg-slate-800 p-1.5 rounded-xl border border-slate-700/50 text-sm font-medium">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button onclick="switchTab('graphs')" id="tab-graphs" class="nav-tab flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                    <i data-lucide="line-chart" class="w-4 h-4"></i>
+                    <span>Live Graphs</span>
+                </button>
+                <button onclick="switchTab('alerts')" id="tab-alerts" class="nav-tab flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                    <i data-lucide="bell" class="w-4 h-4"></i>
+                    <span>Alerts</span>
+                </button>
+                <button onclick="switchTab('history')" id="tab-history" class="nav-tab flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                    <i data-lucide="database" class="w-4 h-4"></i>
+                    <span>History</span>
+                </button>
+                <button onclick="switchTab('health')" id="tab-health" class="nav-tab flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Bridge Health</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- PAGE 1: DASHBOARD -->
+        <div id="page-dashboard" class="tab-content space-y-6">
+            <!-- Connection Status Notification Banner -->
+            <div id="api-status-banner" class="hidden bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl flex items-center justify-between text-xs sm:text-sm">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="wifi-off" class="w-4 h-4 text-amber-600"></i>
+                    <span><strong>Backend Offline:</strong> Standard API (localhost:5000) unreachable. Running on dynamic real-time telemetry simulator.</span>
+                </div>
+                <button onclick="retryConnection()" class="px-3 py-1 bg-amber-200 hover:bg-amber-300 rounded-lg text-amber-900 font-medium transition-colors">
+                    Retry API
+                </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200 gap-4">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500">Current Status</h2>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span id="bridge-status-badge" class="px-4 py-1.5 rounded-full font-bold text-lg bg-slate-100 text-slate-700">
+                            UNKNOWN
+                        </span>
+                        <div class="flex items-center gap-2 text-xs text-slate-500 border-l border-slate-200 pl-3">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Safe</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Warning</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Critical</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-slate-400">Last Telemetry Refresh</p>
+                    <p id="last-updated" class="text-sm font-semibold text-slate-700">--</p>
+                </div>
+            </div>
+
+            <!-- Sensor KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Stress Card -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between text-slate-500 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Stress</span>
+                        <i data-lucide="gauge" class="w-5 h-5 text-indigo-500"></i>
+                    </div>
+                    <p id="stress-value" class="text-3xl font-extrabold text-slate-900">--</p>
+                    <p class="text-xs text-slate-400 mt-2">MPa Structural Load</p>
+                </div>
+
+                <!-- Vibration Card -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between text-slate-500 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Vibration</span>
+                        <i data-lucide="waves" class="w-5 h-5 text-indigo-500"></i>
+                    </div>
+                    <p id="vibration-value" class="text-3xl font-extrabold text-slate-900">--</p>
+                    <p class="text-xs text-slate-400 mt-2">Hz Oscillation Frequency</p>
+                </div>
+
+                <!-- Tilt Card -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between text-slate-500 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Tilt Angle</span>
+                        <i data-lucide="compass" class="w-5 h-5 text-indigo-500"></i>
+                    </div>
+                    <p id="tilt-value" class="text-3xl font-extrabold text-slate-900">--</p>
+                    <p class="text-xs text-slate-400 mt-2">Degrees Inclination</p>
+                </div>
+
+                <!-- Health Score Card -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between text-slate-500 mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Health Index</span>
+                        <i data-lucide="heart-pulse" class="w-5 h-5 text-indigo-500"></i>
+                    </div>
+                    <p id="health-score" class="text-3xl font-extrabold text-slate-900">--</p>
+                    <p class="text-xs text-slate-400 mt-2">Composite Health Metric</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 2: LIVE GRAPHS -->
+        <div id="page-graphs" class="tab-content hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-slate-800">Live Telemetry Trends</h2>
+                <span class="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Streaming Live
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span> Stress vs Time
+                    </h3>
+                    <div class="relative h-64"><canvas id="stressChart"></canvas></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span> Vibration vs Time
+                    </h3>
+                    <div class="relative h-64"><canvas id="vibrationChart"></canvas></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Tilt vs Time
+                    </h3>
+                    <div class="relative h-64"><canvas id="tiltChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 3: ALERTS -->
+        <div id="page-alerts" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-slate-800">System Alert Log</h2>
+                    <span class="text-xs text-slate-400">Triggered thresholds & status logs</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-600">
+                        <thead class="text-xs uppercase bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                            <tr>
+                                <th class="px-6 py-3">Date</th>
+                                <th class="px-6 py-3">Time</th>
+                                <th class="px-6 py-3">Type</th>
+                                <th class="px-6 py-3">Sensor Reading</th>
+                                <th class="px-6 py-3">Severity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table-body" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-400">Loading alerts...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 4: HISTORICAL SENSOR DATA -->
+        <div id="page-history" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="text-lg font-bold text-slate-800">Historical Readings</h2>
+                    <span class="text-xs text-slate-400">Raw time-series database entries</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-600">
+                        <thead class="text-xs uppercase bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                            <tr>
+                                <th class="px-6 py-3">Timestamp</th>
+                                <th class="px-6 py-3">Stress</th>
+                                <th class="px-6 py-3">Vibration</th>
+                                <th class="px-6 py-3">Tilt</th>
+                                <th class="px-6 py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-400">Loading telemetry history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 5: BRIDGE HEALTH -->
+        <div id="page-health" class="tab-content hidden space-y-6">
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 max-w-xl mx-auto text-center space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Bridge Structural Integrity Index</h2>
+                    <p class="text-xs text-slate-400 mt-1">Calculated real-time safety condition score</p>
+                </div>
+
+                <div class="relative w-48 h-48 mx-auto flex items-center justify-center">
+                    <div id="health-circle" class="w-full h-full rounded-full border-[12px] border-slate-200 flex items-center justify-center transition-all duration-500">
+                        <span id="health-score-visual" class="text-5xl font-extrabold text-slate-800">--</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 border-t border-slate-100 pt-6">
+                    <div class="p-3 bg-slate-50 rounded-xl">
+                        <p class="text-xs text-slate-400">Safe Range</p>
+                        <p class="font-bold text-emerald-600 text-sm">80 - 100</p>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-xl">
+                        <p class="text-xs text-slate-400">Warning</p>
+                        <p class="font-bold text-amber-600 text-sm">50 - 79</p>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-xl">
+                        <p class="text-xs text-slate-400">Critical</p>
+                        <p class="font-bold text-rose-600 text-sm">&lt; 50</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 text-slate-400 py-6 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs">
+            Smart Bridge Structural Stress Detection & Health Monitoring System &copy; 2026
+        </div>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        const API_URL = "http://localhost:5000";
+        let charts = {};
+        let isSimulatedMode = false;
+
+        // Simulated Dynamic Telemetry Cache for Offline/Standalone execution
+        let simulatedReadings = Array.from({ length: 15 }, (_, i) => {
+            const time = new Date(Date.now() - (14 - i) * 10000);
+            const stress = +(180 + Math.sin(i * 0.5) * 45 + Math.random() * 10).toFixed(1);
+            const vibration = +(2.1 + Math.cos(i * 0.3) * 0.8 + Math.random() * 0.3).toFixed(2);
+            const tilt = +(0.15 + Math.sin(i * 0.2) * 0.1 + Math.random() * 0.05).toFixed(2);
+            let status = "SAFE";
+            if (stress > 230 || vibration > 3.0) status = "CRITICAL";
+            else if (stress > 210 || vibration > 2.6) status = "WARNING";
+            return {
+                timestamp: time.toISOString(),
+                stress,
+                vibration,
+                tilt,
+                health_score: status === "SAFE" ? Math.floor(88 + Math.random() * 10) : (status === "WARNING" ? Math.floor(65 + Math.random() * 10) : Math.floor(35 + Math.random() * 10)),
+                status
+            };
+        });
+
+        let simulatedAlerts = [
+            { timestamp: new Date(Date.now() - 120000).toISOString(), type: "High Vibration", value: "3.2 Hz", status: "CRITICAL" },
+            { timestamp: new Date(Date.now() - 450000).toISOString(), type: "Stress Spike", value: "215 MPa", status: "WARNING" }
+        ];
+
+        // Generator for next simulated datapoint
+        function produceSimulatedPoint() {
+            const now = new Date();
+            const last = simulatedReadings[simulatedReadings.length - 1];
+            const stress = +(180 + Math.sin(now.getTime() / 5000) * 40 + Math.random() * 15).toFixed(1);
+            const vibration = +(2.0 + Math.sin(now.getTime() / 4000) * 0.7 + Math.random() * 0.4).toFixed(2);
+            const tilt = +(0.15 + Math.cos(now.getTime() / 6000) * 0.08 + Math.random() * 0.02).toFixed(2);
+            
+            let status = "SAFE";
+            if (stress > 225 || vibration > 2.9) status = "CRITICAL";
+            else if (stress > 205 || vibration > 2.5) status = "WARNING";
+
+            const health = status === "SAFE" ? Math.floor(88 + Math.random() * 8) : (status === "WARNING" ? Math.floor(65 + Math.random() * 10) : Math.floor(35 + Math.random() * 10));
+
+            const newPoint = {
+                timestamp: now.toISOString(),
+                stress,
+                vibration,
+                tilt,
+                health_score: health,
+                status
+            };
+
+            simulatedReadings.push(newPoint);
+            if (simulatedReadings.length > 30) simulatedReadings.shift();
+
+            if (status !== "SAFE" && Math.random() > 0.6) {
+                simulatedAlerts.unshift({
+                    timestamp: now.toISOString(),
+                    type: status === "CRITICAL" ? "Severe Oscillation/Load" : "Elevated Strain",
+                    value: `${stress} MPa / ${vibration} Hz`,
+                    status
+                });
+                if (simulatedAlerts.length > 15) simulatedAlerts.pop();
+            }
+
+            return newPoint;
+        }
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab').forEach(el => {
+                el.classList.remove('bg-slate-700', 'text-white');
+                el.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`page-${tabId}`).classList.remove('hidden');
+            const activeTabBtn = document.getElementById(`tab-${tabId}`);
+            if (activeTabBtn) {
+                activeTabBtn.classList.add('bg-slate-700', 'text-white');
+                activeTabBtn.classList.remove('text-slate-300');
+            }
+
+            if (tabId === 'graphs') loadCharts();
+            if (tabId === 'alerts') loadAlerts();
+            if (tabId === 'history') loadHistoryTable();
+        }
+
+        async function retryConnection() {
+            isSimulatedMode = false;
+            document.getElementById("api-status-banner").classList.add("hidden");
+            await fetchLatestData();
+        }
+
+        // Fetch Latest Telemetry (With automatic Fallback to Local Simulation)
+        async function fetchLatestData() {
+            let data;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const response = await fetch(`${API_URL}/api/latest`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error("API response error");
+                data = await response.json();
+                document.getElementById("api-status-banner").classList.add("hidden");
+            } catch (err) {
+                // Activate simulator fallback on failure or CORS block
+                isSimulatedMode = true;
+                document.getElementById("api-status-banner").classList.remove("hidden");
+                data = produceSimulatedPoint();
+            }
+
+            // Update UI elements
+            document.getElementById("stress-value").textContent = data.stress ?? "--";
+            document.getElementById("vibration-value").textContent = data.vibration ?? "--";
+            document.getElementById("tilt-value").textContent = data.tilt ?? "--";
+            document.getElementById("health-score").textContent = data.health_score ?? "--";
+            document.getElementById("health-score-visual").textContent = data.health_score ?? "--";
+
+            // Bridge Status Styling
+            const badge = document.getElementById("bridge-status-badge");
+            badge.textContent = data.status ?? "UNKNOWN";
+            if (data.status === "SAFE") {
+                badge.className = "px-4 py-1.5 rounded-full font-bold text-lg bg-emerald-100 text-emerald-800 border border-emerald-300";
+            } else if (data.status === "WARNING") {
+                badge.className = "px-4 py-1.5 rounded-full font-bold text-lg bg-amber-100 text-amber-800 border border-amber-300";
+            } else if (data.status === "CRITICAL") {
+                badge.className = "px-4 py-1.5 rounded-full font-bold text-lg bg-rose-100 text-rose-800 border border-rose-300";
+            }
+
+            // Visual gauge circle border color
+            const healthCircle = document.getElementById("health-circle");
+            if (data.health_score >= 80) healthCircle.style.borderColor = "#10b981";
+            else if (data.health_score >= 50) healthCircle.style.borderColor = "#f59e0b";
+            else healthCircle.style.borderColor = "#f43f5e";
+
+            if (data.timestamp) {
+                document.getElementById("last-updated").textContent = new Date(data.timestamp).toLocaleTimeString("en-IN");
+            }
+
+            // Dynamically refresh current tab views if active
+            const activeGraphPage = !document.getElementById("page-graphs").classList.contains("hidden");
+            if (activeGraphPage) loadCharts();
+
+            const activeHistoryPage = !document.getElementById("page-history").classList.contains("hidden");
+            if (activeHistoryPage) loadHistoryTable();
+        }
+
+        // Initialize / Refresh Live Charts
+        async function loadCharts() {
+            let readings = [];
+            if (!isSimulatedMode) {
+                try {
+                    const response = await fetch(`${API_URL}/api/history`);
+                    if (response.ok) {
+                        readings = (await response.json()).reverse();
+                    }
+                } catch (err) {
+                    isSimulatedMode = true;
+                }
+            }
+
+            if (isSimulatedMode || readings.length === 0) {
+                readings = [...simulatedReadings];
+            }
+
+            const labels = readings.map(item => new Date(item.timestamp).toLocaleTimeString("en-IN"));
+
+            const configChart = (canvasId, label, data, color) => {
+                const canvasEl = document.getElementById(canvasId);
+                if (!canvasEl) return;
+                
+                if (charts[canvasId]) charts[canvasId].destroy();
+
+                const ctx = canvasEl.getContext('2d');
+                charts[canvasId] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            borderColor: color,
+                            backgroundColor: color + '15',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: { grid: { color: '#f1f5f9' } }
+                        }
+                    }
+                });
+            };
+
+            configChart("stressChart", "Stress", readings.map(r => r.stress), "#6366f1");
+            configChart("vibrationChart", "Vibration", readings.map(r => r.vibration), "#06b6d4");
+            configChart("tiltChart", "Tilt", readings.map(r => r.tilt), "#f59e0b");
+        }
+
+        // Load System Alerts
+        async function loadAlerts() {
+            let alerts = [];
+            if (!isSimulatedMode) {
+                try {
+                    const response = await fetch(`${API_URL}/api/alerts`);
+                    if (response.ok) alerts = await response.json();
+                } catch (err) {
+                    isSimulatedMode = true;
+                }
+            }
+
+            if (isSimulatedMode || alerts.length === 0) {
+                alerts = simulatedAlerts;
+            }
+
+            const tbody = document.getElementById("alerts-table-body");
+            tbody.innerHTML = "";
+
+            if (alerts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">No alerts logged yet</td></tr>`;
+                return;
+            }
+
+            alerts.forEach(a => {
+                const date = new Date(a.timestamp);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="px-6 py-4">${date.toLocaleDateString("en-IN")}</td>
+                        <td class="px-6 py-4">${date.toLocaleTimeString("en-IN")}</td>
+                        <td class="px-6 py-4 font-semibold">${a.type}</td>
+                        <td class="px-6 py-4">${a.value}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${a.status === 'CRITICAL' ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-amber-50 text-amber-600 border border-amber-200'}">
+                                ${a.status}
+                            </span>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        // Load Historical Telemetry Table
+        async function loadHistoryTable() {
+            let readings = [];
+            if (!isSimulatedMode) {
+                try {
+                    const response = await fetch(`${API_URL}/api/history`);
+                    if (response.ok) readings = await response.json();
+                } catch (err) {
+                    isSimulatedMode = true;
+                }
+            }
+
+            if (isSimulatedMode || readings.length === 0) {
+                readings = [...simulatedReadings].reverse();
+            }
+
+            const tbody = document.getElementById("history-table-body");
+            tbody.innerHTML = "";
+
+            if (readings.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-6 text-center text-slate-400">No telemetry records available</td></tr>`;
+                return;
+            }
+
+            readings.forEach(r => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="px-6 py-4">${new Date(r.timestamp).toLocaleString("en-IN")}</td>
+                        <td class="px-6 py-4 font-mono">${r.stress}</td>
+                        <td class="px-6 py-4 font-mono">${r.vibration}</td>
+                        <td class="px-6 py-4 font-mono">${r.tilt}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-medium ${r.status === 'SAFE' ? 'bg-emerald-50 text-emerald-600' : (r.status === 'WARNING' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600')}">
+                                ${r.status}
+                            </span>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        // Bootstrapping
+        document.addEventListener("DOMContentLoaded", () => {
+            if (window.lucide) lucide.createIcons();
+            switchTab('dashboard');
+            fetchLatestData();
+            setInterval(fetchLatestData, 3000);
+        });
+    </script>
+</body>
+</html>
